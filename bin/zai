@@ -334,11 +334,11 @@ for _key_name in "${!_keys[@]}"; do
 	fi
 
 	output_section "Z.ai Coding Plan" "$_level"
-	output_limit_bar "5h window" "$_tl_pct" "$_tl_resets"
+	output_limit_bar "5h window" "$_tk_pct" "$_tk_resets"
+	output_limit_bar "Weekly" "$_tl_pct" "$_tl_resets"
 	if [ -n "$_tl_mcp" ]; then
 		printf '│  └─ MCP usage: %s\n' "$_tl_mcp"
 	fi
-	output_limit_bar "Weekly" "$_tk_pct" "$_tk_resets"
 done
 
 # print_debug "$@"

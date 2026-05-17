@@ -12,6 +12,7 @@ fi
 # @parseArger-declarations
 # @parseArger opt conf "Key config file path" --short c
 # @parseArger opt provider-config "Direct key override: provider::key[::name]"
+# @parseArger opt loop "Replay all providers every N seconds (minimum 30)"
 # @parseArger flag json "Output raw JSON" --short j
 # @parseArger-declarations-end
 
@@ -49,6 +50,7 @@ _optional_positionals=();
 # OPTIONALS ARGUMENTS
 _arg_conf=
 _arg_provider_config=
+_arg_loop=
 # FLAGS
 _arg_json="off"
 # NESTED
@@ -65,9 +67,10 @@ print_help()
 		echo -e "Query all providers sequentially:"
 	echo -e "	-c, --conf <conf>: Key config file path"
 	echo -e "	--provider-config <provider-config>: Direct key override: provider::key[::name]"
+	echo -e "	--loop <loop>: Replay all providers every N seconds (minimum 30)"
 	echo -e "	-j|--json|--no-json: Output raw JSON"
 	echo -e "Usage :
-	$0 [--conf <value>] [--provider-config <value>] [--[no-]json]";
+	$0 [--conf <value>] [--provider-config <value>] [--loop <value>] [--[no-]json]";
 	fi
 
 }
@@ -78,29 +81,29 @@ log() {
 	if [ "${_arg_level}" -le "${_verbose_level}" ]; then
 		case "$_arg_level" in
 			-3)
-				_arg_COLOR="[0;31m";
+				_arg_COLOR="\033[0;31m";
 				;;
 			-2)
-				_arg_COLOR="[0;33m";
+				_arg_COLOR="\033[0;33m";
 				;;
 			-1)
-				_arg_COLOR="[1;33m";
+				_arg_COLOR="\033[1;33m";
 				;;
 			1)
-				_arg_COLOR="[0;32m";
+				_arg_COLOR="\033[0;32m";
 				;;
 			2)
-				_arg_COLOR="[1;36m";
+				_arg_COLOR="\033[1;36m";
 				;;
 			3)
-				_arg_COLOR="[0;36m";
+				_arg_COLOR="\033[0;36m";
 				;;
 			*)
-				_arg_COLOR="[0m";
+				_arg_COLOR="\033[0m";
 				;;
 		esac
 		if [ "${_has_colors}" == "1" ]; then
-			echo -e "${_arg_COLOR}${_arg_msg}[0m";
+			echo -e "${_arg_COLOR}${_arg_msg}\033[0m";
 		else
 			echo "${_arg_msg}";
 		fi
@@ -133,6 +136,15 @@ parse_commandline()
 				;;
 			--provider-config=*)
 				_arg_provider_config="${_key##--provider-config=}"
+				;;
+			
+			--loop)
+				test $# -lt 2 && die "Missing value for the option: '$_key'" 1
+				_arg_loop="$2"
+				shift
+				;;
+			--loop=*)
+				_arg_loop="${_key##--loop=}"
 				;;
 			
 			-j|--json)
@@ -181,8 +193,7 @@ handle_passed_args_count()
 {
 	local _required_args_string=""
 	if [ "${_positionals_count}" -gt 0 ] && [ "$_helpHasBeenPrinted" == "1" ];then
-		_PRINT_HELP=yes die "FATAL ERROR: There were spurious positional arguments --- we expect at most 0 (namely: $_required_args_string), but got ${_positionals_count} (the last one was: '${_last_positional}').
-	${_positionals[*]}" 1
+		_PRINT_HELP=yes die "FATAL ERROR: There were spurious positional arguments --- we expect at most 0 (namely: $_required_args_string), but got ${_positionals_count} (the last one was: '${_last_positional}').\n\t${_positionals[*]}" 1
 	fi
 	if [ "${_positionals_count}" -lt 0 ] && [ "$_helpHasBeenPrinted" == "1" ];then
 		_PRINT_HELP=yes die "FATAL ERROR: Not enough positional arguments - we require at least 0 (namely: $_required_args_string), but got only ${_positionals_count}.
@@ -217,6 +228,7 @@ print_debug()
 	
 	echo -e "	conf: ${_arg_conf}";
 	echo -e "	provider-config: ${_arg_provider_config}";
+	echo -e "	loop: ${_arg_loop}";
 	echo -e "	json: ${_arg_json}";
 
 }
@@ -264,21 +276,45 @@ fi
 
 # Determine the root directory of the limitaid installation
 _limitaid_root="$_SCRIPT_DIR/.."
-
-# Run each provider subcommand sequentially
 _providers=("codex" "openrouter" "zai")
-_exit_code=0
 
-for _prov in "${_providers[@]}"; do
-	_subcmd="$_limitaid_root/bin/$_prov"
-	if [ -x "$_subcmd" ]; then
-		"$_subcmd" "${_common_args[@]}" || _exit_code=$?
-	else
-		echo "Warning: subcommand not found or not executable: $_subcmd" >&2
+_run_once() {
+	local _exit_code=0
+	local _prov _subcmd
+	for _prov in "${_providers[@]}"; do
+		_subcmd="$_limitaid_root/bin/$_prov"
+		if [ -x "$_subcmd" ]; then
+			"$_subcmd" "${_common_args[@]}" || _exit_code=$?
+		else
+			echo "Warning: subcommand not found or not executable: $_subcmd" >&2
+		fi
+	done
+	return "$_exit_code"
+}
+
+if [ -n "$_arg_loop" ]; then
+	if ! [[ "$_arg_loop" =~ ^[0-9]+$ ]]; then
+		die "--loop must be an integer number of seconds" 1
 	fi
-done
 
-exit $_exit_code
+	_loop_seconds="$_arg_loop"
+	if [ "$_loop_seconds" -lt 30 ]; then
+		log "--loop below minimum, using 30 seconds instead of $_loop_seconds" 2
+		_loop_seconds=30
+	fi
+
+	while true; do
+		if [ -t 1 ]; then
+			printf '\033[2J\033[H'
+		fi
+		printf 'LimitAID refresh every %ss - %s\n\n' "$_loop_seconds" "$(date '+%Y-%m-%d %H:%M:%S')"
+		_run_once || true
+		sleep "$_loop_seconds"
+	done
+fi
+
+_run_once
+exit $?
 
 # print_debug "$@"
 # @parseArger-end
