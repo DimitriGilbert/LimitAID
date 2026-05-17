@@ -1,0 +1,20 @@
+# LimitAID Key Configuration
+# Format: <provider>_<name>=<path_to_file_containing_key>
+#
+# The referenced file should contain the raw API key value (no trailing newline).
+#
+# Supported providers: codex, openrouter, zai
+#
+# Codex keys are auto-discovered from ~/.codex/auth.json
+# Z.ai keys are auto-discovered from ~/.config/opencode/opencode.json
+# OpenRouter keys have NO auto-discovery - they must be configured here or via CLI.
+#
+# OpenRouter keys
+# openrouter_work=/home/user/.secrets/openrouter_work
+# openrouter_personal=/home/user/.secrets/openrouter_personal
+#
+# Z.ai keys (overrides auto-discovered key)
+# zai_personal=/home/user/.secrets/zai_personal
+#
+# Codex keys (overrides auto-discovered key)
+# codex_work=/home/user/.secrets/codex_work
