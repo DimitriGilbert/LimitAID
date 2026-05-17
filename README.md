@@ -185,6 +185,8 @@ Loop mode:
 - if a lower value is provided, LimitAID automatically uses `30`
 - loop mode clears the terminal and redraws each cycle
 
+![loop mode demo](loop-demo.jpeg)
+
 ## Common Options
 
 Available on subcommands:
