@@ -8,13 +8,13 @@ interface PageHeroProps {
 
 export default function PageHero({ kicker, title, description }: PageHeroProps) {
   return (
-    <div className="page-wrap mb-16 px-4 rise-in">
-      <p className="island-kicker mb-3">{kicker}</p>
-      <h1 className="display-title text-4xl leading-[1.02] font-bold tracking-tight text-[var(--sea-ink)] sm:text-5xl">
+    <div className="rise-in">
+      <p className="kicker mb-3">{kicker}</p>
+      <h1 className="text-4xl leading-[1.05] font-extrabold tracking-tight text-[var(--ink)] sm:text-5xl md:text-6xl">
         {title}
       </h1>
       {description && (
-        <p className="mt-4 max-w-2xl text-base text-[var(--sea-ink-soft)] sm:text-lg">
+        <p className="mt-5 max-w-xl text-base leading-relaxed text-[var(--ink-soft)] sm:text-lg">
           {description}
         </p>
       )}

@@ -15,28 +15,48 @@ Supported providers:
 - `curl`
 - `jq`
 
-## Install / Run
+## Install
 
-Run from this repository:
+One-liner (clone, make executable, and add to shell rc):
 
 ```bash
-./limitaid codex
-./limitaid zai
-./limitaid openrouter
+bash <(curl -sL https://raw.githubusercontent.com/DimitriGilbert/LimitAID/main/utils/get_limitaid) --install
+```
+
+This downloads LimitAID to the current directory and adds the completion source to `~/.bashrc`.
+
+### Install options
+
+| Flag | Description |
+|------|-------------|
+| `-i, --install` | Add completion source to shell rc after cloning |
+| `--install-file <path>` | Specific rc file to install to (repeatable) |
+| `--install-directory <path>` | Where to clone LimitAID |
+| `-b, --branch <ref>` | Branch or tag to install |
+| `--ssh` | Clone using SSH instead of HTTPS |
+| `--zip` | Download as zip instead of cloning (not recommended) |
+| `--remove-installer` | Delete the install script after running |
+
+### Manual install
+
+Clone and run from this repository:
+
+```bash
+git clone https://github.com/DimitriGilbert/LimitAID.git
+cd LimitAID
 ./limitaid all
-./limitaid all --loop 30
 ```
 
-If you want shell completion in bash:
+To add shell completion persistently:
 
 ```bash
-source ./completely.bash
+echo 'source /path/to/LimitAID/completely.bash' >> ~/.bashrc
 ```
 
-To make it persistent:
+Or use the included install helper:
 
 ```bash
-echo 'source /absolute/path/to/LimitAID/completely.bash' >> ~/.bashrc
+./utils/install --shell-rc-file ~/.bashrc
 ```
 
 ## Top-Level Usage
@@ -339,6 +359,8 @@ lib/config.sh       Key loading and auto-discovery
 lib/http.sh         HTTP helpers
 lib/time.sh         Time formatting helpers
 lib/output.sh       Pretty output helpers
+utils/get_limitaid  One-liner install script
+utils/install       Shell rc installer
 keys.conf.example   Config example
 completely.bash     Bash completion script
 ```

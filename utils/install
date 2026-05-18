@@ -1,0 +1,106 @@
+#!/bin/bash
+_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+
+_arg_shell_rc_file=("$HOME/.bashrc" )
+_arg_comment="on"
+
+die()
+{
+	local _ret="${2:-1}"
+	echo -e "\033[0;31m$1\033[0m" >&2
+	exit "${_ret}"
+}
+
+log() {
+	local _arg_msg="${1}";
+	local _arg_level="${2:-0}";
+	_verbose_level="${_verbose_level:-0}";
+	if [ "${_arg_level}" -le "${_verbose_level}" ]; then
+		case "$_arg_level" in
+			-3) _arg_COLOR="\033[0;31m" ;;
+			-2) _arg_COLOR="\033[0;33m" ;;
+			-1) _arg_COLOR="\033[1;33m" ;;
+			1)  _arg_COLOR="\033[0;32m" ;;
+			2)  _arg_COLOR="\033[1;36m" ;;
+			3)  _arg_COLOR="\033[0;36m" ;;
+			*)  _arg_COLOR="\033[0m" ;;
+		esac
+		echo -e "${_arg_COLOR}${_arg_msg}\033[0m";
+	fi
+}
+
+print_help()
+{
+	echo -e "Install LimitAID:"
+	echo -e "  --shell-rc-file <file>: where to put the source directive, repeatable [default: \$HOME/.bashrc]"
+	echo -e "  --comment|--no-comment: add LimitAID comment, on by default"
+	echo -e "Usage:"
+	echo -e "  $0 [--shell-rc-file <value>] [--[no-]comment]"
+}
+
+parse_commandline()
+{
+	while test $# -gt 0
+	do
+		_key="$1"
+		case "$_key" in
+			--shell-rc-file)
+				test $# -lt 2 && die "Missing value for the option: '$_key'" 1
+				_arg_shell_rc_file+=("$2")
+				shift
+				;;
+			--shell-rc-file=*)
+				_arg_shell_rc_file+=("${_key##--shell-rc-file=}")
+				;;
+			--comment)
+				_arg_comment="on"
+				;;
+			--no-comment)
+				_arg_comment="off"
+				;;
+			-h|--help)
+				print_help;
+				exit 0;
+				;;
+			--verbose)
+				if [ $# -lt 2 ];then
+					_verbose_level="$((${_verbose_level:-0} + 1))";
+				else
+					_verbose_level="$2";
+					shift;
+				fi
+				;;
+			*)
+				die "Unknown option: $_key" 1
+				;;
+		esac
+		shift
+	done
+}
+
+on_interrupt() {
+	die "Process aborted!" 130;
+}
+
+parse_commandline "$@";
+trap on_interrupt INT;
+
+output="\nexport LIMITAID_ROOT_DIR=\"$_dir\"
+source \"${_dir}/completely.bash\"";
+
+if [ "$_arg_comment" != "off" ]; then
+	output="\n# LimitAID${output}";
+fi
+
+for _file in "${_arg_shell_rc_file[@]}"; do
+	if [ -f "$_file" ]; then
+		if ! grep -q "completely.bash" "$_file"; then
+			echo -e "$output" >> "$_file";
+			log "LimitAID installed in $_file" 1;
+		else
+			log "LimitAID already installed in $_file" 1;
+		fi
+	else
+		log "File $_file not found" -1;
+	fi
+done

@@ -21,22 +21,22 @@ export default function Header() {
   const closeMobile = useCallback(() => setMobileOpen(false), [])
 
   return (
-    <header className="sticky top-0 z-50 border-b border-[var(--line)] bg-[var(--header-bg)] px-4 backdrop-blur-lg">
-      <nav className="page-wrap flex items-center justify-between py-3 sm:py-4">
-        {/* Logo */}
-        <h2 className="m-0 flex-shrink-0 text-base font-semibold tracking-tight">
+    <header className="sticky top-0 z-50 border-b border-[var(--border)] bg-[var(--header-bg)] px-4 backdrop-blur-md">
+      <nav className="page-wrap flex items-center justify-between py-3">
+        <h2 className="m-0 shrink-0 text-base font-bold tracking-tight">
           <Link
             to="/"
             onClick={closeMobile}
-            className="inline-flex items-center gap-2 rounded-full border border-[var(--chip-line)] bg-[var(--chip-bg)] px-3 py-1.5 text-sm no-underline shadow-[0_8px_24px_rgba(30,90,72,0.08)] sm:px-4 sm:py-2"
+            className="inline-flex items-center gap-2 no-underline text-[var(--ink)]"
           >
-            <span className="h-2 w-2 rounded-full bg-[linear-gradient(90deg,#56c6be,#7ed3bf)]" />
-            <span className="text-[var(--lagoon)]">LimitAID</span>
+            <span className="flex h-6 w-6 items-center justify-center rounded-md bg-[var(--green)] text-[10px] font-extrabold text-white">
+              L
+            </span>
+            <span>LimitAID</span>
           </Link>
         </h2>
 
-        {/* Desktop nav links */}
-        <div className="hidden items-center gap-5 text-sm font-semibold sm:flex">
+        <div className="hidden items-center gap-6 text-sm font-semibold sm:flex">
           {NAV_LINKS.map((link) => (
             <NavLink
               key={link.href}
@@ -49,8 +49,7 @@ export default function Header() {
           ))}
         </div>
 
-        {/* Right section: theme toggle + mobile hamburger */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <ThemeToggle />
 
           <button
@@ -58,7 +57,7 @@ export default function Header() {
             onClick={() => setMobileOpen((prev) => !prev)}
             aria-label={mobileOpen ? 'Close navigation menu' : 'Open navigation menu'}
             aria-expanded={mobileOpen}
-            className="flex flex-col items-center justify-center gap-[5px] rounded-lg p-2 text-[var(--sea-ink-soft)] transition hover:bg-[var(--link-bg-hover)] hover:text-[var(--sea-ink)] sm:hidden"
+            className="flex flex-col items-center justify-center gap-[5px] rounded-md p-2 text-[var(--ink-soft)] transition hover:bg-[var(--surface-1)] hover:text-[var(--ink)] sm:hidden"
           >
             <span
               className="block h-[2px] w-5 rounded-full bg-current transition-transform duration-200"
@@ -84,7 +83,6 @@ export default function Header() {
         </div>
       </nav>
 
-      {/* Mobile nav dropdown */}
       <div
         className="grid overflow-hidden transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] sm:hidden"
         style={{
@@ -109,8 +107,6 @@ export default function Header() {
     </header>
   )
 }
-
-/* ------------------------------------------------------------------ */
 
 interface NavLinkProps {
   href: string

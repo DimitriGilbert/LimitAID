@@ -2,27 +2,27 @@ export default function Footer() {
   const year = new Date().getFullYear()
 
   return (
-    <footer className="site-footer mt-20 px-4 pb-14 pt-10 text-[var(--sea-ink-soft)]">
-      <div className="page-wrap flex flex-col items-center gap-3 text-center">
-        <p className="island-kicker m-0">
-          AI provider quota monitoring from the terminal
-        </p>
-        <div className="flex items-center gap-2 text-sm">
-          <span>&copy; {year} LimitAID</span>
-          <span className="opacity-40" aria-hidden="true">
-            &middot;
-          </span>
+    <footer className="site-footer mt-20 px-4 pb-12 pt-8 text-[var(--ink-muted)]">
+      <div className="page-wrap flex flex-col items-center gap-2 text-center text-[13px]">
+        <div className="mb-1 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-[var(--green)]">
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--green)]" />
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--red)]" />
+          LimitAID
+        </div>
+        <div className="flex items-center gap-2">
+          <span>&copy; {year} Dimitri Gilbert</span>
+          <span className="opacity-30" aria-hidden="true">&middot;</span>
           <a
             href="https://github.com/DimitriGilbert/LimitAID"
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1.5 text-[var(--sea-ink-soft)] no-underline transition hover:text-[var(--sea-ink)]"
+            className="inline-flex items-center gap-1.5 text-[var(--ink-muted)] no-underline transition hover:text-[var(--ink)]"
           >
             <svg
               viewBox="0 0 16 16"
               aria-hidden="true"
-              width="16"
-              height="16"
+              width="14"
+              height="14"
               className="shrink-0"
             >
               <path

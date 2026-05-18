@@ -1,0 +1,202 @@
+#!/bin/bash
+ecmd=();
+mcmd=(chmod "+x" "-R");
+_arg_branch=
+_arg_install_directory=
+_arg_install_file=()
+_arg_install="off"
+_arg_remove_installer="off"
+_arg_ssh="off"
+_arg_zip="off"
+_verbose_level="0";
+
+die()
+{
+	local _ret="${2:-1}"
+	log "$1" -3 >&2
+	exit "${_ret}"
+}
+
+log() {
+	local _arg_msg="${1}";
+	local _arg_level="${2:-0}";
+	if [ "${_arg_level}" -le "${_verbose_level}" ]; then
+		case "$_arg_level" in
+			-3)
+				_arg_COLOR="\033[0;31m";
+				;;
+			-2)
+				_arg_COLOR="\033[0;33m";
+				;;
+			-1)
+				_arg_COLOR="\033[1;33m";
+				;;
+			1)
+				_arg_COLOR="\033[0;32m";
+				;;
+			2)
+				_arg_COLOR="\033[1;36m";
+				;;
+			3)
+				_arg_COLOR="\033[0;36m";
+				;;
+			*)
+				_arg_COLOR="\033[0m";
+				;;
+		esac
+		echo -e "${_arg_COLOR}${_arg_msg}\033[0m";
+	fi
+}
+
+print_help()
+{
+	echo -e "get_limitaid - Download and install LimitAID:"
+	echo -e "  -b, --branch|--tag <branch>: version to install"
+	echo -e "  --install-directory <dir>: where to install"
+	echo -e "  --install-file <file>: rc files to install to, repeatable"
+	echo -e "  -i|--install: install in shell rc"
+	echo -e "  --remove-installer: remove install script itself"
+	echo -e "  --ssh: clone using ssh"
+	echo -e "  --zip: install using zip archive"
+	echo -e ""
+	echo -e "Usage:"
+	echo -e "  $0 [--branch <value>] [--install-directory <value>] [--install-file <value>] [-i] [--ssh] [--zip]"
+}
+
+parse_commandline()
+{
+	while test $# -gt 0
+	do
+		_key="$1"
+		case "$_key" in
+			-b|--tag|--branch)
+				test $# -lt 2 && die "Missing value for the option: '$_key'" 1
+				_arg_branch="$2"
+				shift
+				;;
+			--install-directory)
+				test $# -lt 2 && die "Missing value for the option: '$_key'" 1
+				_arg_install_directory="$2"
+				shift
+				;;
+			--install-file)
+				test $# -lt 2 && die "Missing value for the option: '$_key'" 1
+				_arg_install_file+=("$2")
+				shift
+				;;
+			-i|--install)
+				_arg_install="on"
+				;;
+			--remove-installer)
+				_arg_remove_installer="on"
+				;;
+			--ssh)
+				_arg_ssh="on"
+				;;
+			--zip)
+				_arg_zip="on"
+				;;
+			-h|--help)
+				print_help;
+				exit 0;
+				;;
+			--verbose)
+				if [ $# -lt 2 ];then
+					_verbose_level="$((_verbose_level + 1))";
+				else
+					_verbose_level="$2";
+					shift;
+				fi
+				;;
+			*)
+				die "Unknown option: $_key" 1
+				;;
+		esac
+		shift
+	done
+}
+
+on_interrupt() {
+	die "Process aborted!" 130;
+}
+
+parse_commandline "$@";
+trap on_interrupt INT;
+
+if [ "$_arg_zip" != "on" ] && [ "$(command -v git)" ]; then
+	ecmd+=(git clone);
+
+	if [ "$_arg_ssh" == "on" ]; then
+		ecmd+=("git@github.com:DimitriGilbert/LimitAID.git");
+	else
+		ecmd+=("https://github.com/DimitriGilbert/LimitAID.git");
+	fi
+
+	if [ "$_arg_branch" != "" ]; then
+		ecmd+=(-b "$_arg_branch");
+	fi
+
+	if [ "$_arg_install_directory" != "" ]; then
+		ecmd+=("$_arg_install_directory");
+		mcmd+=("$_arg_install_directory/limitaid" "$_arg_install_directory/bin" "$_arg_install_directory/utils");
+	else
+		mcmd+=("LimitAID/limitaid" "LimitAID/bin" "LimitAID/utils");
+	fi
+else
+	if [ "$_arg_branch" == "" ]; then
+		_arg_branch="main";
+	fi
+	_arg_zip="on";
+	log "Install using zip" -1;
+	ecmd+=(curl "https://github.com/DimitriGilbert/LimitAID/archive/refs/heads/${_arg_branch}.zip" -LJO);
+	zcmd=(unzip -qq);
+	zcmd2=(mv);
+
+	if [ "$_arg_install_directory" != "" ]; then
+		zcmd+=(-d "/tmp");
+		mcmd+=("$_arg_install_directory/limitaid" "$_arg_install_directory/bin" "$_arg_install_directory/utils");
+		zcmd2+=("/tmp/LimitAID-${_arg_branch}" "$_arg_install_directory");
+	else
+		mcmd+=("LimitAID/limitaid" "LimitAID/bin" "LimitAID/utils");
+		zcmd2+=("LimitAID-${_arg_branch}" "LimitAID");
+	fi
+	zcmd+=( "LimitAID-${_arg_branch}.zip" );
+fi
+
+log "${ecmd[*]}" 1;
+"${ecmd[@]}" || die "Download failed" 1
+
+if [ "$_arg_zip" == "on" ]; then
+	log "${zcmd[*]}" 1;
+	"${zcmd[@]}" || die "Extraction failed" 1;
+	log "${zcmd2[*]}" 1;
+	"${zcmd2[@]}" || die "Move failed" 1;
+	rm "LimitAID-${_arg_branch}.zip";
+fi
+
+log "${mcmd[*]}" 1;
+"${mcmd[@]}" || die "chmod failed" 1
+
+if [ "$_arg_install" == "on" ] || [ "${#_arg_install_file[@]}" -gt 0 ]; then
+	icmd=("utils/install" --verbose 1);
+	if [ "${#_arg_install_file[@]}" -gt 0 ]; then
+		for ifile in "${_arg_install_file[@]}"; do
+			icmd+=("--shell-rc-file" "$ifile");
+		done
+	fi
+	log "${icmd[*]}" 1;
+
+	if [ "$_arg_install_directory" != "" ]; then
+		cd "${_arg_install_directory}" || die "Cannot cd to install directory" 1;
+	else
+		cd LimitAID || die "Cannot cd to LimitAID directory" 1;
+	fi
+	"${icmd[@]}";
+	cd - > /dev/null;
+fi
+
+if [ "$_arg_remove_installer" == "on" ]; then
+	rm -- "$0";
+fi
+
+log "LimitAID installed successfully!" 1;
