@@ -1,4 +1,4 @@
-import{t as e}from"./index-BYnEZRCh.js";import{t}from"./PageHero-Bx9eNYCq.js";import{t as n}from"./ProseContent-Faj7PLgC.js";import{t as r}from"./Terminable-eGdVCWzN.js";var i=e(),a=[{prompt:`./limitaid codex`,output:`Codex/OpenAI (prolite)
+import{t as e}from"./index-DjUbq7TC.js";import{t}from"./PageHero-CI7gFcoM.js";import{t as n}from"./ProseContent-CRHxncHP.js";import{t as r}from"./Terminable-fstUKPHZ.js";var i=e(),a=[{prompt:`./limitaid codex`,output:`Codex/OpenAI (prolite)
 ├─ 5h window:  11% used ██████░░░░░░░░░░░░░░░░ resets in 4h35m
 ├─ Weekly:     12% used ███░░░░░░░░░░░░░░░░░░░░ resets in 6d5h
 ├─ Credits:    $0.00
