@@ -115,3 +115,24 @@ output_tree_branch() {
 output_tree_end() {
 	printf '└─\n'
 }
+
+# json_output <json_string>
+# Prints unified JSON. If _arg_json="on" (set by --json flag), this outputs
+# the unified schema. Each provider constructs a JSON array of result objects
+# and passes the whole array string to this function.
+#
+# Unified schema per entry:
+# {
+#   "provider": "codex",
+#   "key_name": "default",
+#   "plan": "...",
+#   "limits": [ { "label": "...", "used_percent": N, "resets_in": "...", "resets_at": N } ],
+#   "credits": { "balance": N, "unlimited": bool },
+#   "usage": { ... provider-specific fields ... },
+#   "extra": { ... provider-specific fields ... },
+#   "raw": { ... original API response ... }
+# }
+json_output() {
+	local json_array="$1"
+	printf '%s\n' "$json_array" | jq '.'
+}

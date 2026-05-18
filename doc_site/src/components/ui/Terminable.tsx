@@ -328,9 +328,10 @@ export default function Terminable({
 
         setDisplay((prev) => {
           const newDisplay = [...prev];
-          const lastEntry = newDisplay[newDisplay.length - 1];
+          const lastIndex = newDisplay.length - 1;
+          const lastEntry = newDisplay[lastIndex];
           if (lastEntry?.type === "output") {
-            lastEntry.content = line.content;
+            newDisplay[lastIndex] = { ...lastEntry, content: line.content };
           }
           return newDisplay;
         });

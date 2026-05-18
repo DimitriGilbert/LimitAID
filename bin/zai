@@ -290,6 +290,7 @@ fi
 # Iterate over keys
 _key_count=${#_keys[@]}
 _current=0
+_json_results=()
 for _key_name in "${!_keys[@]}"; do
 	_current=$((_current + 1))
 	_key_value="${_keys[$_key_name]}"
@@ -298,12 +299,15 @@ for _key_name in "${!_keys[@]}"; do
 	http_get "$_url" "$_key_value" _response
 
 	if [ "$_http_status" -ne 200 ]; then
-		echo "Error: API returned status $_http_status for key $_key_name" >&2
-		continue
-	fi
-
-	if [ "$_arg_json" = "on" ]; then
-		echo "$_response"
+		if [ "$_arg_json" = "on" ]; then
+			_json_results+=("$(jq -n \
+				--arg provider "$_provider" \
+				--arg key_name "$_key_name" \
+				--argjson status "$_http_status" \
+				'{provider: $provider, key_name: $key_name, error: "HTTP \($status)"}')")
+		else
+			echo "Error: API returned status $_http_status for key $_key_name" >&2
+		fi
 		continue
 	fi
 
@@ -313,6 +317,7 @@ for _key_name in "${!_keys[@]}"; do
 	_time_limit="$(echo "$_response" | jq -c '.data.limits[] | select(.type == "TIME_LIMIT")' 2>/dev/null | head -1)"
 	_tl_pct="0"
 	_tl_resets="N/A"
+	_tl_reset_s="0"
 	_tl_mcp=""
 	if [ -n "$_time_limit" ]; then
 		_tl_pct="$(echo "$_time_limit" | jq -r '.percentage // 0' 2>/dev/null)"
@@ -326,11 +331,44 @@ for _key_name in "${!_keys[@]}"; do
 	_tokens_limit="$(echo "$_response" | jq -c '.data.limits[] | select(.type == "TOKENS_LIMIT")' 2>/dev/null | head -1)"
 	_tk_pct="0"
 	_tk_resets="N/A"
+	_tk_reset_s="0"
 	if [ -n "$_tokens_limit" ]; then
 		_tk_pct="$(echo "$_tokens_limit" | jq -r '.percentage // 0' 2>/dev/null)"
 		_tk_reset_ms="$(echo "$_tokens_limit" | jq -r '.nextResetTime // 0' 2>/dev/null)"
 		_tk_reset_s=$((_tk_reset_ms / 1000))
 		_tk_resets="$(time_format_remaining "$_tk_reset_s")"
+	fi
+
+	# Unified JSON output
+	if [ "$_arg_json" = "on" ]; then
+		_limits_json="[]"
+		_limits_json="$(echo "$_limits_json" | jq \
+			--arg label "5h window" \
+			--argjson pct "$_tk_pct" \
+			--arg resets_in "$_tk_resets" \
+			--argjson resets_at "$_tk_reset_s" \
+			'. + [{label: $label, used_percent: $pct, resets_in: $resets_in, resets_at: $resets_at}]')"
+		_limits_json="$(echo "$_limits_json" | jq \
+			--arg label "Weekly" \
+			--argjson pct "$_tl_pct" \
+			--arg resets_in "$_tl_resets" \
+			--argjson resets_at "$_tl_reset_s" \
+			'. + [{label: $label, used_percent: $pct, resets_in: $resets_in, resets_at: $resets_at}]')"
+
+		_mcp_json="null"
+		if [ -n "$_tl_mcp" ]; then
+			_mcp_json="$(jq -R -s 'split(",") | map(split(": ") | {(.[0]): .[1]}) | add // null' <<< "$_tl_mcp")"
+		fi
+
+		_json_results+=("$(jq -n \
+			--arg provider "$_provider" \
+			--arg key_name "$_key_name" \
+			--arg plan "$_level" \
+			--argjson limits "$_limits_json" \
+			--argjson mcp "$_mcp_json" \
+			--argjson raw "$_response" \
+			'{provider: $provider, key_name: $key_name, plan: $plan, limits: $limits, credits: null, usage: null, extra: {mcp_usage: $mcp}, raw: $raw}')")
+		continue
 	fi
 
 	output_section "Z.ai Coding Plan" "$_level"
@@ -340,6 +378,21 @@ for _key_name in "${!_keys[@]}"; do
 		printf '│  └─ MCP usage: %s\n' "$_tl_mcp"
 	fi
 done
+
+if [ "$_arg_json" = "on" ]; then
+	_json_array="["
+	_first=1
+	for _result in "${_json_results[@]}"; do
+		if [ "$_first" -eq 1 ]; then
+			_json_array="${_json_array}${_result}"
+			_first=0
+		else
+			_json_array="${_json_array},${_result}"
+		fi
+	done
+	_json_array="${_json_array}]"
+	json_output "$_json_array"
+fi
 
 # print_debug "$@"
 # @parseArger-end

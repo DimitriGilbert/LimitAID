@@ -85,8 +85,8 @@ on_interrupt() {
 parse_commandline "$@";
 trap on_interrupt INT;
 
-output="\nexport LIMITAID_ROOT_DIR=\"$_dir\"
-source \"${_dir}/completely.bash\"";
+output="\nexport LIMITAID_ROOT_DIR='$_dir'
+source '${_dir}/completely.bash'";
 
 if [ "$_arg_comment" != "off" ]; then
 	output="\n# LimitAID${output}";

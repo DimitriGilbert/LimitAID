@@ -1,6 +1,6 @@
 #!/bin/bash
 ecmd=();
-mcmd=(chmod "+x" "-R");
+mcmd=(chmod "+x");
 _arg_branch=
 _arg_install_directory=
 _arg_install_file=()
@@ -146,21 +146,28 @@ else
 	if [ "$_arg_branch" == "" ]; then
 		_arg_branch="main";
 	fi
+	_safe_branch="${_arg_branch//\//-}"
 	_arg_zip="on";
+	if ! command -v curl > /dev/null 2>&1; then
+		die "curl is required for zip installation but not found. Please install curl or use git clone instead." 1
+	fi
+	if ! command -v unzip > /dev/null 2>&1; then
+		die "unzip is required for zip installation but not found. Please install unzip or use git clone instead." 1
+	fi
 	log "Install using zip" -1;
-	ecmd+=(curl "https://github.com/DimitriGilbert/LimitAID/archive/refs/heads/${_arg_branch}.zip" -LJO);
+	ecmd+=(curl "https://github.com/DimitriGilbert/LimitAID/archive/refs/heads/${_arg_branch}.zip" -Lo "LimitAID-${_safe_branch}.zip");
 	zcmd=(unzip -qq);
 	zcmd2=(mv);
 
 	if [ "$_arg_install_directory" != "" ]; then
 		zcmd+=(-d "/tmp");
 		mcmd+=("$_arg_install_directory/limitaid" "$_arg_install_directory/bin" "$_arg_install_directory/utils");
-		zcmd2+=("/tmp/LimitAID-${_arg_branch}" "$_arg_install_directory");
+		zcmd2+=("/tmp/LimitAID-${_safe_branch}" "$_arg_install_directory");
 	else
 		mcmd+=("LimitAID/limitaid" "LimitAID/bin" "LimitAID/utils");
-		zcmd2+=("LimitAID-${_arg_branch}" "LimitAID");
+		zcmd2+=("LimitAID-${_safe_branch}" "LimitAID");
 	fi
-	zcmd+=( "LimitAID-${_arg_branch}.zip" );
+	zcmd+=( "LimitAID-${_safe_branch}.zip" );
 fi
 
 log "${ecmd[*]}" 1;
@@ -171,7 +178,7 @@ if [ "$_arg_zip" == "on" ]; then
 	"${zcmd[@]}" || die "Extraction failed" 1;
 	log "${zcmd2[*]}" 1;
 	"${zcmd2[@]}" || die "Move failed" 1;
-	rm "LimitAID-${_arg_branch}.zip";
+	rm "LimitAID-${_safe_branch}.zip";
 fi
 
 log "${mcmd[*]}" 1;
@@ -192,7 +199,7 @@ if [ "$_arg_install" == "on" ] || [ "${#_arg_install_file[@]}" -gt 0 ]; then
 		cd LimitAID || die "Cannot cd to LimitAID directory" 1;
 	fi
 	"${icmd[@]}";
-	cd - > /dev/null;
+	cd - > /dev/null || die "Cannot cd back" 1;
 fi
 
 if [ "$_arg_remove_installer" == "on" ]; then

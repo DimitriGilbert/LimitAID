@@ -291,6 +291,7 @@ fi
 # Iterate over keys
 _key_count=${#_keys[@]}
 _current=0
+_json_results=()
 for _key_name in "${!_keys[@]}"; do
 	_current=$((_current + 1))
 	_key_value="${_keys[$_key_name]}"
@@ -300,12 +301,15 @@ for _key_name in "${!_keys[@]}"; do
 	http_get "$_url" "$_key_value" _response
 
 	if [ "$_http_status" -ne 200 ]; then
-		echo "Error: API returned status $_http_status for key $_key_name" >&2
-		continue
-	fi
-
-	if [ "$_arg_json" = "on" ]; then
-		echo "$_response"
+		if [ "$_arg_json" = "on" ]; then
+			_json_results+=("$(jq -n \
+				--arg provider "$_provider" \
+				--arg key_name "$_key_name" \
+				--argjson status "$_http_status" \
+				'{provider: $provider, key_name: $key_name, error: "HTTP \($status)"}')")
+		else
+			echo "Error: API returned status $_http_status for key $_key_name" >&2
+		fi
 		continue
 	fi
 
@@ -316,6 +320,35 @@ for _key_name in "${!_keys[@]}"; do
 	_usage_weekly="$(echo "$_response" | jq -r '.data.usage_weekly // 0' 2>/dev/null)"
 	_usage_monthly="$(echo "$_response" | jq -r '.data.usage_monthly // 0' 2>/dev/null)"
 	_is_free="$(echo "$_response" | jq -r '.data.is_free_tier // false' 2>/dev/null)"
+
+	# Unified JSON output
+	if [ "$_arg_json" = "on" ]; then
+		_limit_json="null"
+		if [ "$_limit" != "null" ]; then
+			_pct=0
+			if [ "$_limit_rem" != "null" ]; then
+				_pct="$(echo "scale=0; $_limit_rem * 100 / $_limit" | bc 2>/dev/null || echo "0")"
+			fi
+			_limit_json="$(jq -n \
+				--argjson limit "$_limit" \
+				--argjson remaining "${_limit_rem:-null}" \
+				--argjson pct "$_pct" \
+				'{limit: $limit, remaining: $remaining, used_percent: $pct}')"
+		fi
+
+		_json_results+=("$(jq -n \
+			--arg provider "$_provider" \
+			--arg key_name "$_key_name" \
+			--arg label "$_label" \
+			--argjson limit "$_limit_json" \
+			--argjson usage_daily "$_usage_daily" \
+			--argjson usage_weekly "$_usage_weekly" \
+			--argjson usage_monthly "$_usage_monthly" \
+			--argjson is_free "$_is_free" \
+			--argjson raw "$_response" \
+			'{provider: $provider, key_name: $key_name, plan: (if $is_free then "free" else "paid" end), limits: [], credits: $limit, usage: {daily: $usage_daily, weekly: $usage_weekly, monthly: $usage_monthly}, extra: {label: $label, is_free_tier: $is_free}, raw: $raw}')")
+		continue
+	fi
 
 	# Build key display name
 	_display="$_key_name ($_key_preview)"
@@ -343,11 +376,25 @@ for _key_name in "${!_keys[@]}"; do
 		printf '└─ %-14s $%s\n' "Usage this month:" "$_usage_monthly"
 	fi
 
-	# Blank line between keys if more keys follow
 	if [ "$_current" -lt "$_key_count" ]; then
 		echo ""
 	fi
 done
+
+if [ "$_arg_json" = "on" ]; then
+	_json_array="["
+	_first=1
+	for _result in "${_json_results[@]}"; do
+		if [ "$_first" -eq 1 ]; then
+			_json_array="${_json_array}${_result}"
+			_first=0
+		else
+			_json_array="${_json_array},${_result}"
+		fi
+	done
+	_json_array="${_json_array}]"
+	json_output "$_json_array"
+fi
 
 # print_debug "$@"
 # @parseArger-end

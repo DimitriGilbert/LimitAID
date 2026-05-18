@@ -39,7 +39,7 @@
   --muted: oklch(0.965 0 0);
   --muted-foreground: oklch(0.48 0 0);
   --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.985 0 0);
   --input: oklch(0.965 0 0);
   --ring: oklch(0.7 0 0);
   --chart-1: oklch(0.646 0.222 41.116);

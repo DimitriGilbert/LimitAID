@@ -274,6 +274,7 @@ _build_bar() {
 
 _key_count=${#_keys[@]}
 _current=0
+_json_results=()
 for _key_name in "${!_keys[@]}"; do
 	_current=$((_current + 1))
 	_key_value="${_keys[$_key_name]}"
@@ -282,13 +283,15 @@ for _key_name in "${!_keys[@]}"; do
 	http_get "$_url" "$_key_value" _response
 
 	if [ "$_http_status" -ne 200 ]; then
-		echo "Error: API returned status $_http_status" >&2
-		continue
-	fi
-
-	# Raw JSON passthrough
-	if [ "$_arg_json" = "on" ]; then
-		echo "$_response"
+		if [ "$_arg_json" = "on" ]; then
+			_json_results+=("$(jq -n \
+				--arg provider "$_provider" \
+				--arg key_name "$_key_name" \
+				--argjson status "$_http_status" \
+				'{provider: $provider, key_name: $key_name, error: "HTTP \($status)"}')")
+		else
+			echo "Error: API returned status $_http_status" >&2
+		fi
 		continue
 	fi
 
@@ -308,24 +311,80 @@ for _key_name in "${!_keys[@]}"; do
 	_sec_label="$(time_format_window "$_sec_win")"
 	_sec_resets="$(time_format_remaining "$_sec_reset")"
 
-	output_section "Codex/OpenAI" "$_plan_type"
-	output_limit_bar "$_pri_label" "$_pri_pct" "$_pri_resets"
-	output_limit_bar "$_sec_label" "$_sec_pct" "$_sec_resets"
-
-	# Credits line
-	if [ "$_credit_ul" = "true" ]; then
-		printf '│  %-14s unlimited\n' "Credits:"
-	else
-		printf '│  %-14s $%s\n' "Credits:" "$_credit_bal"
-	fi
-
-	# Spark sub-limits (nested under additional_rate_limits)
-	# Use jq array indexing to get first match (avoids head -1 truncating JSON)
+	# Spark sub-limits
 	_spark="$(echo "$_response" | jq '
 		[.additional_rate_limits[]?
 		| select(.limit_name // "" | test("spark"; "i"))
 		| .rate_limit // empty][0] // empty
 	')"
+
+	# Unified JSON output
+	if [ "$_arg_json" = "on" ]; then
+		_limits_json="[]"
+		_limits_json="$(echo "$_limits_json" | jq \
+			--arg label "$_pri_label" \
+			--argjson pct "$_pri_pct" \
+			--arg resets_in "$_pri_resets" \
+			--argjson resets_at "$_pri_reset" \
+			'. + [{label: $label, used_percent: $pct, resets_in: $resets_in, resets_at: $resets_at}]')"
+		_limits_json="$(echo "$_limits_json" | jq \
+			--arg label "$_sec_label" \
+			--argjson pct "$_sec_pct" \
+			--arg resets_in "$_sec_resets" \
+			--argjson resets_at "$_sec_reset" \
+			'. + [{label: $label, used_percent: $pct, resets_in: $resets_in, resets_at: $resets_at}]')"
+
+		_spark_json="null"
+		if [ -n "$_spark" ]; then
+			_sp_pri_pct="$(echo "$_spark" | jq -r '.primary_window.used_percent // 0')"
+			_sp_pri_win="$(echo "$_spark" | jq -r '.primary_window.limit_window_seconds // 0')"
+			_sp_pri_reset="$(echo "$_spark" | jq -r '.primary_window.reset_at // 0')"
+			_sp_sec_pct="$(echo "$_spark" | jq -r '.secondary_window.used_percent // 0')"
+			_sp_sec_win="$(echo "$_spark" | jq -r '.secondary_window.limit_window_seconds // 0')"
+			_sp_sec_reset="$(echo "$_spark" | jq -r '.secondary_window.reset_at // 0')"
+			_sp_pri_label="$(time_format_window "$_sp_pri_win")"
+			_sp_pri_resets="$(time_format_remaining "$_sp_pri_reset")"
+			_sp_sec_label="$(time_format_window "$_sp_sec_win")"
+			_sp_sec_resets="$(time_format_remaining "$_sp_sec_reset")"
+
+			_spark_limits="[]"
+			_spark_limits="$(echo "$_spark_limits" | jq \
+				--arg label "$_sp_pri_label" \
+				--argjson pct "$_sp_pri_pct" \
+				--arg resets_in "$_sp_pri_resets" \
+				--argjson resets_at "$_sp_pri_reset" \
+				'. + [{label: $label, used_percent: $pct, resets_in: $resets_in, resets_at: $resets_at}]')"
+			_spark_limits="$(echo "$_spark_limits" | jq \
+				--arg label "$_sp_sec_label" \
+				--argjson pct "$_sp_sec_pct" \
+				--arg resets_in "$_sp_sec_resets" \
+				--argjson resets_at "$_sp_sec_reset" \
+				'. + [{label: $label, used_percent: $pct, resets_in: $resets_in, resets_at: $resets_at}]')"
+			_spark_json="$(echo "$_spark_limits" | jq -n --argjson limits "$_spark_limits" '{limits: $limits}')"
+		fi
+
+		_json_results+=("$(jq -n \
+			--arg provider "$_provider" \
+			--arg key_name "$_key_name" \
+			--arg plan "$_plan_type" \
+			--argjson limits "$_limits_json" \
+			--arg credit_bal "$_credit_bal" \
+			--argjson credit_ul "$_credit_ul" \
+			--argjson spark "$_spark_json" \
+			--argjson raw "$_response" \
+			'{provider: $provider, key_name: $key_name, plan: $plan, limits: $limits, credits: {balance: ($credit_bal | tonumber), unlimited: $credit_ul}, extra: {spark: $spark}, raw: $raw}')")
+		continue
+	fi
+
+	output_section "Codex/OpenAI" "$_plan_type"
+	output_limit_bar "$_pri_label" "$_pri_pct" "$_pri_resets"
+	output_limit_bar "$_sec_label" "$_sec_pct" "$_sec_resets"
+
+	if [ "$_credit_ul" = "true" ]; then
+		printf '│  %-14s unlimited\n' "Credits:"
+	else
+		printf '│  %-14s $%s\n' "Credits:" "$_credit_bal"
+	fi
 
 	if [ -n "$_spark" ]; then
 		_sp_pri_pct="$(echo "$_spark" | jq -r '.primary_window.used_percent // 0')"
@@ -354,6 +413,21 @@ for _key_name in "${!_keys[@]}"; do
 		output_tree_branch
 	fi
 done
+
+if [ "$_arg_json" = "on" ]; then
+	_json_array="["
+	_first=1
+	for _result in "${_json_results[@]}"; do
+		if [ "$_first" -eq 1 ]; then
+			_json_array="${_json_array}${_result}"
+			_first=0
+		else
+			_json_array="${_json_array},${_result}"
+		fi
+	done
+	_json_array="${_json_array}]"
+	json_output "$_json_array"
+fi
 
 # print_debug "$@"
 # @parseArger-end

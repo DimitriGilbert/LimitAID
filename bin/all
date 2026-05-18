@@ -286,11 +286,42 @@ _run_once() {
 		if [ -x "$_subcmd" ]; then
 			"$_subcmd" "${_common_args[@]}" || _exit_code=$?
 		else
-			echo "Warning: subcommand not found or not executable: $_subcmd" >&2
+			if [ "$_arg_json" = "on" ]; then
+				jq -n --arg provider "$_prov" '{provider: $provider, error: "subcommand not found"}'
+			else
+				echo "Warning: subcommand not found or not executable: $_subcmd" >&2
+			fi
 		fi
 	done
 	return "$_exit_code"
 }
+
+_run_once_json() {
+	local _exit_code=0
+	local _all_json="[]"
+	local _prov _subcmd _output
+	for _prov in "${_providers[@]}"; do
+		_subcmd="$_limitaid_root/bin/$_prov"
+		if [ -x "$_subcmd" ]; then
+			_output="$("$_subcmd" "${_common_args[@]}" 2>/dev/null)" || _exit_code=$?
+			if [ -n "$_output" ]; then
+				if echo "$_output" | jq -e '.' > /dev/null 2>&1; then
+					_all_json="$(echo "$_all_json" | jq --argjson chunk "$_output" '. + $chunk')"
+				else
+					_all_json="$(echo "$_all_json" | jq --arg provider "$_prov" --arg raw "$_output" '. + [{provider: $provider, error: "invalid JSON output", raw: $raw}]')"
+				fi
+			fi
+		else
+			_all_json="$(echo "$_all_json" | jq --arg provider "$_prov" '. + [{provider: $provider, error: "subcommand not found"}]')"
+		fi
+	done
+	json_output "$_all_json"
+	return "$_exit_code"
+}
+
+if [ -n "$_arg_loop" ] && [ "$_arg_json" = "on" ]; then
+	die "--json and --loop are incompatible. Use --json for single output or --loop for interactive monitoring." 1
+fi
 
 if [ -n "$_arg_loop" ]; then
 	if ! [[ "$_arg_loop" =~ ^[0-9]+$ ]]; then
@@ -311,6 +342,11 @@ if [ -n "$_arg_loop" ]; then
 		_run_once || true
 		sleep "$_loop_seconds"
 	done
+fi
+
+if [ "$_arg_json" = "on" ]; then
+	_run_once_json
+	exit $?
 fi
 
 _run_once
