@@ -10,11 +10,23 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ProvidersRouteImport } from './routes/providers'
+import { Route as ConfigurationRouteImport } from './routes/configuration'
+import { Route as CliRouteImport } from './routes/cli'
 import { Route as IndexRouteImport } from './routes/index'
 
 const ProvidersRoute = ProvidersRouteImport.update({
   id: '/providers',
   path: '/providers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConfigurationRoute = ConfigurationRouteImport.update({
+  id: '/configuration',
+  path: '/configuration',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CliRoute = CliRouteImport.update({
+  id: '/cli',
+  path: '/cli',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -25,27 +37,35 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/cli': typeof CliRoute
+  '/configuration': typeof ConfigurationRoute
   '/providers': typeof ProvidersRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/cli': typeof CliRoute
+  '/configuration': typeof ConfigurationRoute
   '/providers': typeof ProvidersRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/cli': typeof CliRoute
+  '/configuration': typeof ConfigurationRoute
   '/providers': typeof ProvidersRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/providers'
+  fullPaths: '/' | '/cli' | '/configuration' | '/providers'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/providers'
-  id: '__root__' | '/' | '/providers'
+  to: '/' | '/cli' | '/configuration' | '/providers'
+  id: '__root__' | '/' | '/cli' | '/configuration' | '/providers'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CliRoute: typeof CliRoute
+  ConfigurationRoute: typeof ConfigurationRoute
   ProvidersRoute: typeof ProvidersRoute
 }
 
@@ -56,6 +76,20 @@ declare module '@tanstack/react-router' {
       path: '/providers'
       fullPath: '/providers'
       preLoaderRoute: typeof ProvidersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/configuration': {
+      id: '/configuration'
+      path: '/configuration'
+      fullPath: '/configuration'
+      preLoaderRoute: typeof ConfigurationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cli': {
+      id: '/cli'
+      path: '/cli'
+      fullPath: '/cli'
+      preLoaderRoute: typeof CliRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -70,6 +104,8 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CliRoute: CliRoute,
+  ConfigurationRoute: ConfigurationRoute,
   ProvidersRoute: ProvidersRoute,
 }
 export const routeTree = rootRouteImport
