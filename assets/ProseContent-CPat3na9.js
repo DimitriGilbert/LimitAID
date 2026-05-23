@@ -1,0 +1,1 @@
+import{t as e}from"./index-BVrNi_GV.js";var t=e();function n({children:e,className:n}){return(0,t.jsx)(`div`,{className:`page-wrap px-4`,children:(0,t.jsx)(`div`,{className:`prose prose-lg dark:prose-invert max-w-none ${n??``}`,children:e})})}export{n as t};
