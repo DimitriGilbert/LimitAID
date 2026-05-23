@@ -13,6 +13,7 @@ fi
 # @parseArger opt conf "Key config file path" --short c
 # @parseArger opt provider-config "Direct key override: zai::<api_key>[::<name>]"
 # @parseArger opt name "Query specific key by name" --short n
+# @parseArger opt usage-days "Token usage lookback in days" --short u
 # @parseArger flag json "Output raw JSON" --short j
 # @parseArger-declarations-end
 
@@ -51,6 +52,7 @@ _optional_positionals=();
 _arg_conf=
 _arg_provider_config=
 _arg_name=
+_arg_usage_days=
 # FLAGS
 _arg_json="off"
 # NESTED
@@ -68,9 +70,10 @@ print_help()
 	echo -e "	-c, --conf <conf>: Key config file path"
 	echo -e "	--provider-config <provider-config>: Direct key override: zai::<api_key>[::<name>]"
 	echo -e "	-n, --name <name>: Query specific key by name"
+	echo -e "	-u, --usage-days <usage-days>: Token usage lookback in days"
 	echo -e "	-j|--json|--no-json: Output raw JSON"
 	echo -e "Usage :
-	$0 [--conf <value>] [--provider-config <value>] [--name <value>] [--[no-]json]";
+	$0 [--conf <value>] [--provider-config <value>] [--name <value>] [--usage-days <value>] [--[no-]json]";
 	fi
 
 }
@@ -148,6 +151,18 @@ parse_commandline()
 				;;
 			-n*)
 				_arg_name="${_key##-n}"
+				;;
+			
+			-u|--usage-days)
+				test $# -lt 2 && die "Missing value for the option: '$_key'" 1
+				_arg_usage_days="$2"
+				shift
+				;;
+			--usage-days=*)
+				_arg_usage_days="${_key##--usage-days=}"
+				;;
+			-u*)
+				_arg_usage_days="${_key##-u}"
 				;;
 			
 			-j|--json)
@@ -233,6 +248,7 @@ print_debug()
 	echo -e "	conf: ${_arg_conf}";
 	echo -e "	provider-config: ${_arg_provider_config}";
 	echo -e "	name: ${_arg_name}";
+	echo -e "	usage-days: ${_arg_usage_days}";
 	echo -e "	json: ${_arg_json}";
 
 }
@@ -268,6 +284,31 @@ set -euo pipefail
 
 # Provider identifier for this subcommand
 _provider="zai"
+
+if [ -z "$_arg_usage_days" ]; then
+	_arg_usage_days=1
+fi
+if ! [[ "$_arg_usage_days" =~ ^[0-9]+$ ]] || [ "$_arg_usage_days" -lt 1 ]; then
+	die "--usage-days must be a positive integer" 1
+fi
+
+format_number() {
+	local value="$1"
+	printf '%s' "$value" | sed ':a;s/\B[0-9]\{3\}\>/,&/;ta'
+}
+
+format_mtokens() {
+	local value="$1"
+	awk -v n="$value" 'BEGIN { printf "%.1fM tok", n / 1000000 }'
+}
+
+zai_usage_url() {
+	local days="$1"
+	local start end
+	start="$(TZ=Asia/Shanghai date -d "$days days ago" '+%Y-%m-%d+%H:%M:%S')"
+	end="$(TZ=Asia/Shanghai date '+%Y-%m-%d+%H:%M:%S')"
+	printf 'https://api.z.ai/api/monitor/usage/model-usage?startTime=%s&endTime=%s' "$start" "$end"
+}
 
 # Load keys for this provider
 declare -A _keys=()
@@ -339,6 +380,28 @@ for _key_name in "${!_keys[@]}"; do
 		_tk_resets="$(time_format_remaining "$_tk_reset_s")"
 	fi
 
+	_usage_response=""
+	_usage_status="0"
+	_usage_url="$(zai_usage_url "$_arg_usage_days")"
+	http_get "$_usage_url" "$_key_value" _usage_response
+	_usage_status="$_http_status"
+	_usage_json="null"
+	_usage_total_tokens="0"
+	_usage_total_calls="0"
+	_usage_models="[]"
+	if [ "$_usage_status" -eq 200 ] && echo "$_usage_response" | jq -e '.data.totalUsage' >/dev/null 2>&1; then
+		_usage_total_tokens="$(echo "$_usage_response" | jq -r '.data.totalUsage.totalTokensUsage // 0' 2>/dev/null)"
+		_usage_total_calls="$(echo "$_usage_response" | jq -r '.data.totalUsage.totalModelCallCount // 0' 2>/dev/null)"
+		_usage_models="$(echo "$_usage_response" | jq -c '[.data.modelDataList[]? | {model: .modelName, tokens: ([.tokensUsage[]?] | add // 0)} | select(.tokens > 0)]' 2>/dev/null)"
+		_usage_json="$(jq -n \
+			--argjson days "$_arg_usage_days" \
+			--argjson total_tokens "$_usage_total_tokens" \
+			--argjson total_model_calls "$_usage_total_calls" \
+			--argjson models "$_usage_models" \
+			--argjson raw "$_usage_response" \
+			'{period_days: $days, total_tokens: $total_tokens, total_model_calls: $total_model_calls, models: $models, raw: $raw}')"
+	fi
+
 	# Unified JSON output
 	if [ "$_arg_json" = "on" ]; then
 		_limits_json="[]"
@@ -365,9 +428,10 @@ for _key_name in "${!_keys[@]}"; do
 			--arg key_name "$_key_name" \
 			--arg plan "$_level" \
 			--argjson limits "$_limits_json" \
+			--argjson usage "$_usage_json" \
 			--argjson mcp "$_mcp_json" \
 			--argjson raw "$_response" \
-			'{provider: $provider, key_name: $key_name, plan: $plan, limits: $limits, credits: null, usage: null, extra: {mcp_usage: $mcp}, raw: $raw}')")
+			'{provider: $provider, key_name: $key_name, plan: $plan, limits: $limits, credits: null, usage: $usage, extra: {mcp_usage: $mcp}, raw: $raw}')")
 		continue
 	fi
 
@@ -376,6 +440,16 @@ for _key_name in "${!_keys[@]}"; do
 	output_limit_bar "Weekly" "$_tl_pct" "$_tl_resets"
 	if [ -n "$_tl_mcp" ]; then
 		printf '│  └─ MCP usage: %s\n' "$_tl_mcp"
+	fi
+	if [ "$_usage_json" != "null" ]; then
+		printf '│  %-14s %s, %s calls over %sd\n' \
+			"Token usage:" "$(format_mtokens "$_usage_total_tokens")" "$(format_number "$_usage_total_calls")" "$_arg_usage_days"
+		_usage_model_lines="$(echo "$_usage_models" | jq -r '.[] | "\(.model | sub("^GLM-"; "")): \(.tokens / 1000000 | (. * 10 | round / 10))M"' 2>/dev/null | paste -sd ',' -)"
+		if [ -n "$_usage_model_lines" ]; then
+			printf '│  └─ Models: %s\n' "$_usage_model_lines"
+		fi
+	elif [ "$_usage_status" -ne 200 ]; then
+		printf '│  Token usage: unavailable (HTTP %s)\n' "$_usage_status" >&2
 	fi
 done
 

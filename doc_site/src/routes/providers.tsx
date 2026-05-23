@@ -5,8 +5,16 @@ import ProseContent from '#/components/ProseContent'
 import CodexDemo from '#/components/demos/CodexDemo'
 import OpenRouterDemo from '#/components/demos/OpenRouterDemo'
 import ZaiDemo from '#/components/demos/ZaiDemo'
+import { seo } from '#/lib/seo'
 
 export const Route = createFileRoute('/providers')({
+  head: () =>
+    seo({
+      title: 'LimitAID Providers - Codex, OpenRouter, and Z.ai Monitoring',
+      description:
+        'See how LimitAID monitors Codex, OpenRouter, and Z.ai rate limits, balances, token usage, and provider-specific quotas.',
+      path: '/providers',
+    }),
   component: ProvidersPage,
 })
 

@@ -2,8 +2,16 @@ import { createFileRoute } from '@tanstack/react-router'
 
 import PageHero from '#/components/PageHero'
 import ProseContent from '#/components/ProseContent'
+import { seo } from '#/lib/seo'
 
 export const Route = createFileRoute('/configuration')({
+  head: () =>
+    seo({
+      title: 'LimitAID Configuration - API Keys and Provider Setup',
+      description:
+        'Configure LimitAID API keys for Codex, OpenRouter, and Z.ai with auto-discovery, keys.conf, and command-line overrides.',
+      path: '/configuration',
+    }),
   component: ConfigurationPage,
 })
 

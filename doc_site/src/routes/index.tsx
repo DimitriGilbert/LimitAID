@@ -3,8 +3,16 @@ import { Layers, BarChart3, Repeat, Zap } from 'lucide-react'
 
 import PageHero from '#/components/PageHero'
 import AllDemo from '#/components/demos/AllDemo'
+import { seo } from '#/lib/seo'
 
 export const Route = createFileRoute('/')({
+  head: () =>
+    seo({
+      title: 'LimitAID - Check AI Quotas from Your Terminal',
+      description:
+        'Monitor Codex, OpenRouter, and Z.ai quotas, balances, and usage from one simple CLI command.',
+      path: '/',
+    }),
   component: LandingPage,
 })
 

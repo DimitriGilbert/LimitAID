@@ -2,8 +2,16 @@ import { createFileRoute } from '@tanstack/react-router'
 
 import PageHero from '#/components/PageHero'
 import ProseContent from '#/components/ProseContent'
+import { seo } from '#/lib/seo'
 
 export const Route = createFileRoute('/cli')({
+  head: () =>
+    seo({
+      title: 'LimitAID CLI Reference - Commands, Flags, and Examples',
+      description:
+        'Reference for LimitAID CLI commands, provider subcommands, global flags, loop mode, JSON output, and common invocations.',
+      path: '/cli',
+    }),
   component: CLIReferencePage,
 })
 
